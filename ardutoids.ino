@@ -43,7 +43,7 @@ float bulletY[MAX_BULLETS];
 float bulletVelX[MAX_BULLETS];
 float bulletVelY[MAX_BULLETS];
 
-const int MAX_ASTEROIDS=1;
+const int MAX_ASTEROIDS=3;
 int asteroidCounter;
 uint8_t asteroidActive[MAX_ASTEROIDS];
 uint8_t asteroidBeenOnScreen[MAX_ASTEROIDS];
@@ -53,24 +53,23 @@ float asteroidVelX[MAX_ASTEROIDS];
 float asteroidVelY[MAX_ASTEROIDS];
 
 const int MAX_EXPLOSIONS=1;
-int explosionCounter;
 uint8_t explosionIndex;
 uint8_t explosionX[MAX_EXPLOSIONS];
 uint8_t explosionY[MAX_EXPLOSIONS];
 uint8_t explosionTimer[MAX_EXPLOSIONS];
-const int explosionFrames = 20;
+const int explosionFrames = 12;
 
 const uint8_t MAX_SHIP_PARTICLES=0;
-const uint16_t shipParticleLifeFrames=6;
+const uint16_t shipParticleLifeFrames=20;
 uint8_t shipParticleX[MAX_SHIP_PARTICLES];
 uint8_t shipParticleY[MAX_SHIP_PARTICLES];
 uint8_t shipParticleIndex;
 uint16_t shipParticleFrame[MAX_SHIP_PARTICLES];
 
 
-const int MAX_PARTICLES=20;
+const int MAX_PARTICLES=32;
 const float particleSpeed = 0.3;
-const uint16_t particleLifeFrames=30;
+const uint16_t particleLifeFrames=10;
 float particleX[MAX_PARTICLES];
 float particleY[MAX_PARTICLES];
 float particleVelX[MAX_PARTICLES];
@@ -78,15 +77,23 @@ float particleVelY[MAX_PARTICLES];
 uint16_t particleFrame[MAX_PARTICLES];
 int particleIndex;
 
-const int numExplosionParticles = 20;
+const int numExplosionParticles = 16;
 const float explosionForce = 4.0f;
 void explosion(int x, int y) {
+  
   float angle = (2*3.1415901f)/numExplosionParticles;
   for (int i = 0; i < numExplosionParticles; i++) {
       float velX = explosionForce*cos(angle*i);
       float velY = explosionForce*sin(angle*i);
       spawnParticle(x,y,velX,velY);
   }
+  
+  explosionX[explosionIndex] = x;
+  explosionY[explosionIndex] = y;
+  explosionTimer[explosionIndex] = 0;
+  explosionIndex = (explosionIndex+1) % MAX_EXPLOSIONS;
+  
+  //arduboy.fillCircle(x,y,12,BLACK);
 }
 void spawnShipParticle(int x, int y) {
   shipParticleX[shipParticleIndex] = x;
@@ -213,7 +220,7 @@ void loop() {
   BeepPin2::timer();
   // first we clear our screen to black
   
-  
+  //arduboy.clear();
  
   prevShipAngle = shipAngle;
   prevShipX = shipX;
@@ -315,6 +322,16 @@ void loop() {
       arduboy.drawPixel((int)shipParticleX[i], (int)shipParticleY[i]);
     }
   }
+  for (int i = 0; i < MAX_EXPLOSIONS; i++) {
+    if (explosionTimer[i] < explosionFrames) {
+      explosionTimer[i]++;
+
+      float zeroToOne = ((float)explosionTimer[i])/explosionFrames;
+      arduboy.fillCircle(explosionX[i], explosionY[i], zeroToOne*16, BLACK);
+      //arduboy.drawCircle(explosionX[i], explosionY[i], zeroToOne*4);
+    }
+  }
+
   for (int i = 0; i < MAX_PARTICLES; i++) {
     if (particleFrame[i] < particleLifeFrames) {
 
@@ -323,7 +340,7 @@ void loop() {
 
       int xn1 = (int)(particleX[i]-particleVelX[i]);
       int yn1 = (int)(particleY[i]-particleVelY[i]);
-      float d = 3.25f;
+      float d = 1.25f;
       int xn2 = (int)(particleX[i]-particleVelX[i]*d);
       int yn2 = (int)(particleY[i]-particleVelY[i]*d);
       arduboy.drawLine(xn1,yn1,xn2,yn2,BLACK);
@@ -334,7 +351,7 @@ void loop() {
 
       //arduboy.drawPixel((int)particleX[i], (int)particleY[i]);  
       //arduboy.drawLine((int)particleX[i], (int)particleY[i], x1,y1, BLACK);
-      arduboy.fillCircle((int)particleX[i],(int)particleY[i],1,BLACK);
+      //arduboy.fillCircle((int)particleX[i],(int)particleY[i],1,BLACK);
       arduboy.drawLine((int)particleX[i], (int)particleY[i], x1,y1);
       particleFrame[i]++;
     }
@@ -502,6 +519,8 @@ void loop() {
 
       spawnParticle(x1, y1, -shipVelX, -shipVelY);
       spawnParticle(x2, y2, -shipVelX, -shipVelY);
+      //spawnShipParticle(x1, y1);
+      //spawnShipParticle(x2, y2);
     }
   }
   
