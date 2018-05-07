@@ -12,7 +12,7 @@ version 2.1 of the License, or (at your option) any later version.
 */
 
 #include <Arduboy2.h>
-
+#define DO_SCREEN_CLEAR true
 // make an instance of arduboy used for many functions
 Arduboy2 arduboy;
 
@@ -52,24 +52,26 @@ float asteroidY[MAX_ASTEROIDS];
 float asteroidVelX[MAX_ASTEROIDS];
 float asteroidVelY[MAX_ASTEROIDS];
 
-const int MAX_EXPLOSIONS=1;
+const int MAX_EXPLOSIONS=0;
 uint8_t explosionIndex;
 uint8_t explosionX[MAX_EXPLOSIONS];
 uint8_t explosionY[MAX_EXPLOSIONS];
 uint8_t explosionTimer[MAX_EXPLOSIONS];
 const int explosionFrames = 12;
 
-const uint8_t MAX_SHIP_PARTICLES=0;
-const uint16_t shipParticleLifeFrames=20;
-uint8_t shipParticleX[MAX_SHIP_PARTICLES];
-uint8_t shipParticleY[MAX_SHIP_PARTICLES];
+const uint8_t MAX_SHIP_PARTICLES=16;
+
+float shipParticleX[MAX_SHIP_PARTICLES];
+float shipParticleY[MAX_SHIP_PARTICLES];
+float shipParticleVelX[MAX_SHIP_PARTICLES];
+float shipParticleVelY[MAX_SHIP_PARTICLES];
+
 uint8_t shipParticleIndex;
-uint16_t shipParticleFrame[MAX_SHIP_PARTICLES];
 
 
-const int MAX_PARTICLES=32;
+const int MAX_PARTICLES=7;
 const float particleSpeed = 0.3;
-const uint16_t particleLifeFrames=10;
+const uint16_t particleLifeFrames=12;
 float particleX[MAX_PARTICLES];
 float particleY[MAX_PARTICLES];
 float particleVelX[MAX_PARTICLES];
@@ -77,29 +79,68 @@ float particleVelY[MAX_PARTICLES];
 uint16_t particleFrame[MAX_PARTICLES];
 int particleIndex;
 
-const int numExplosionParticles = 16;
+const int numExplosionParticles = 7;
 const float explosionForce = 4.0f;
+
+
+
+const int scanClearRateY = 768;
+int scanClearY;
+uint8_t scanningHorizontal;
+
+void scanClear() {
+  for (int i = 0; i < scanClearRateY; i++) {
+    if (i % 2 == scanningHorizontal % 2) {
+      int i2 = (i + scanClearY)%(WIDTH*HEIGHT);
+
+      if (scanningHorizontal % 2 == 0) {
+        int y = i2/WIDTH;
+        int x = i2 - y*WIDTH;
+        if (scanningHorizontal < 2)
+          arduboy.drawPixel(x,y,BLACK);
+        else
+          arduboy.drawPixel(x+1,y,BLACK);
+      }
+      else{
+        int x = i2/HEIGHT;
+        int y = i2 - x*HEIGHT;
+        if (scanningHorizontal < 2)
+          arduboy.drawPixel(x,y,BLACK);
+        else
+          arduboy.drawPixel(x,y+1,BLACK);
+      }
+    }
+  }
+  scanClearY = (scanClearY + scanClearRateY);
+  if (scanClearY > WIDTH*HEIGHT) {
+    scanClearY = 0;
+    scanningHorizontal = (scanningHorizontal + 1) % 4;
+  }
+}
 void explosion(int x, int y) {
-  
+    arduboy.fillCircle(x,y,asteroidSize,BLACK);
+
   float angle = (2*3.1415901f)/numExplosionParticles;
   for (int i = 0; i < numExplosionParticles; i++) {
       float velX = explosionForce*cos(angle*i);
       float velY = explosionForce*sin(angle*i);
       spawnParticle(x,y,velX,velY);
   }
+  if (MAX_EXPLOSIONS > 0) {
+    explosionX[explosionIndex] = x;
+    explosionY[explosionIndex] = y;
+    explosionTimer[explosionIndex] = 0;
+    explosionIndex = (explosionIndex+1) % MAX_EXPLOSIONS;
+  }
   
-  explosionX[explosionIndex] = x;
-  explosionY[explosionIndex] = y;
-  explosionTimer[explosionIndex] = 0;
-  explosionIndex = (explosionIndex+1) % MAX_EXPLOSIONS;
-  
-  //arduboy.fillCircle(x,y,12,BLACK);
 }
-void spawnShipParticle(int x, int y) {
+void spawnShipParticle(int x, int y, float velX, float velY) {
   shipParticleX[shipParticleIndex] = x;
   shipParticleY[shipParticleIndex] = y;
-  shipParticleFrame[shipParticleIndex] = 0;
+  shipParticleVelX[shipParticleIndex] = velX;
+  shipParticleVelY[shipParticleIndex] = velY;
   shipParticleIndex = (shipParticleIndex+1) % MAX_SHIP_PARTICLES;
+  arduboy.drawPixel(x,y);
 }
 void spawnParticle(int x, int y, float velX, float velY) {
   particleX[particleIndex] = x;
@@ -108,6 +149,7 @@ void spawnParticle(int x, int y, float velX, float velY) {
   particleVelY[particleIndex] = velY;
   particleFrame[particleIndex] = 0;
   particleIndex = (particleIndex+1) % MAX_PARTICLES;
+  arduboy.drawPixel(x,y);
 }
 void spawnAsteroid(int i) {
     int dist = asteroidSize*3;
@@ -218,9 +260,13 @@ void loop() {
   }
 
   BeepPin2::timer();
+  BeepPin2::noTone();
   // first we clear our screen to black
   
-  //arduboy.clear();
+  if (DO_SCREEN_CLEAR)
+    arduboy.clear();
+  else
+    scanClear();
  
   prevShipAngle = shipAngle;
   prevShipX = shipX;
@@ -230,9 +276,11 @@ void loop() {
   if (arduboy.pressed(B_BUTTON)) {
     shipVelX += cos(shipAngle)*acceleration;
     shipVelY += sin(shipAngle)*acceleration;
-    BeepPin2::tone(BeepPin2::freq(100.0f), 0);
+    if (arduboy.everyXFrames(2)){
+      BeepPin2::tone(BeepPin2::freq(2.0f+(shipParticleIndex*0.5f)), 1);
+    }
   } else {
-    BeepPin2::noTone();
+    //BeepPin2::noTone();
   }
   // shooting
   if (arduboy.pressed(A_BUTTON)) {
@@ -276,38 +324,7 @@ void loop() {
   screen.width = WIDTH;
   screen.height = HEIGHT;
 
-  for (int i = 0; i < MAX_BULLETS; i++) {
-    Point bulletPoint;
-    bulletPoint.x = (int)bulletX[i];
-    bulletPoint.y = (int)bulletY[i];
-    
-    if (arduboy.collide(bulletPoint, screen)) {
-      //bulletVelX[i] -= bulletVelX[i]*0.05f;
-      //bulletVelY[i] -= bulletVelY[i]*0.05f;
-      arduboy.fillCircle((int)bulletX[i], (int)bulletY[i], bulletSize*2, BLACK);
 
-      bulletX[i] += bulletVelX[i];
-      bulletY[i] += bulletVelY[i];
-      
-      arduboy.drawCircle((int)bulletX[i], (int)bulletY[i], bulletSize, WHITE);
-
-      for (int a = 0; a < MAX_ASTEROIDS; a++) {
-        float deltaX = bulletX[i] - asteroidX[a];
-        float deltaY = bulletY[i] - asteroidY[a];
-        float mutalRadius = bulletSize + asteroidSize;
-        if (pow(deltaX,2) + pow(deltaY,2) < pow(mutalRadius,2)) {
-          score++;
-          explosion(asteroidX[a], asteroidY[a]);
-          asteroidActive[a] = 0;
-          asteroids--;
-          asteroidX[a] = -100.0f;
-          asteroidY[a] = -100.0f;
-
-        }
-
-      }
-    }
-  }
 
   /*
   arduboy.print(WIDTH);
@@ -317,10 +334,12 @@ void loop() {
   */
   // draw the asteroids
   for (int i = 0; i < MAX_SHIP_PARTICLES; i++) {
-    if (shipParticleFrame[i] < shipParticleLifeFrames) {
-      shipParticleFrame[i]++;
-      arduboy.drawPixel((int)shipParticleX[i], (int)shipParticleY[i]);
-    }
+    shipParticleX[i] += shipParticleVelX[i];
+    shipParticleY[i] += shipParticleVelY[i];
+    shipParticleVelX[i] *= 0.9f;
+    shipParticleVelY[i] *= 0.9f;
+    arduboy.drawPixel((int)shipParticleX[i], (int)shipParticleY[i]);
+
   }
   for (int i = 0; i < MAX_EXPLOSIONS; i++) {
     if (explosionTimer[i] < explosionFrames) {
@@ -343,17 +362,27 @@ void loop() {
       float d = 1.25f;
       int xn2 = (int)(particleX[i]-particleVelX[i]*d);
       int yn2 = (int)(particleY[i]-particleVelY[i]*d);
-      arduboy.drawLine(xn1,yn1,xn2,yn2,BLACK);
+      //arduboy.drawLine(xn1,yn1,xn2,yn2,BLACK);
       particleX[i] += particleVelX[i];
       particleY[i] += particleVelY[i];
       particleVelX[i] *= 0.8f;
       particleVelY[i] *= 0.8f;
-
-      //arduboy.drawPixel((int)particleX[i], (int)particleY[i]);  
-      //arduboy.drawLine((int)particleX[i], (int)particleY[i], x1,y1, BLACK);
+      int x2= (int)particleX[i];
+      int y2 = (int)particleY[i];
+      //arduboy.drawPixel(2*(x2-x1) + x1, 2*(y2-y1) + y1, BLACK);
+      if (!DO_SCREEN_CLEAR) {
+        arduboy.drawPixel(x1, y1, BLACK);
+        arduboy.drawPixel(x2, y2);
+      }
+      else {
+        arduboy.drawLine((int)particleX[i], (int)particleY[i], x1,y1);  
+      }
       //arduboy.fillCircle((int)particleX[i],(int)particleY[i],1,BLACK);
-      arduboy.drawLine((int)particleX[i], (int)particleY[i], x1,y1);
+      //arduboy.drawLine((int)particleX[i], (int)particleY[i], x1,y1);
       particleFrame[i]++;
+    }
+    else {
+      arduboy.drawPixel((int)particleX[i], (int)particleY[i], BLACK);
     }
   }
 
@@ -429,6 +458,41 @@ void loop() {
     }
     asteroids = MAX_ASTEROIDS;
   }
+
+  for (int i = 0; i < MAX_BULLETS; i++) {
+    Point bulletPoint;
+    bulletPoint.x = (int)bulletX[i];
+    bulletPoint.y = (int)bulletY[i];
+    
+    if (arduboy.collide(bulletPoint, screen)) {
+      //bulletVelX[i] -= bulletVelX[i]*0.05f;
+      //bulletVelY[i] -= bulletVelY[i]*0.05f;
+      arduboy.fillCircle((int)bulletX[i], (int)bulletY[i], bulletSize*2, BLACK);
+
+      bulletX[i] += bulletVelX[i];
+      bulletY[i] += bulletVelY[i];
+      
+      arduboy.drawCircle((int)bulletX[i], (int)bulletY[i], bulletSize, WHITE);
+      bool doBeep = false;
+      for (int a = 0; a < MAX_ASTEROIDS; a++) {
+        float deltaX = bulletX[i] - asteroidX[a];
+        float deltaY = bulletY[i] - asteroidY[a];
+        float mutalRadius = bulletSize + asteroidSize;
+        if (pow(deltaX,2) + pow(deltaY,2) < pow(mutalRadius,2)) {
+          score++;
+          explosion(asteroidX[a], asteroidY[a]);
+          asteroidActive[a] = 0;
+          asteroids--;
+          asteroidX[a] = -100.0f;
+          asteroidY[a] = -100.0f;
+          doBeep = true;
+        }
+      }
+      if (doBeep) {
+        BeepPin2::tone(BeepPin2::freq(50.0f), 2);
+      }
+    }
+  }
   // draw the ship
   //arduboy.fillCircle((int)shipX, (int)shipY, shipSize*0.5f, WHITE);
   // rotation matrix:
@@ -438,34 +502,34 @@ void loop() {
   //int y1 = y0 * s + y0 * c;
 
 
-  float size = 3.0f;
+  float shipSize = 3.0f;
   float oneThird = 2.0f / 3.0f * 3.14159;
 
   // undraw previous ship
   {
     
     /*
-    int x0 = prevShipX + cos(prevShipAngle)*2*size;
-    int y0 = prevShipY + sin(prevShipAngle)*2*size;
+    int x0 = prevShipX + cos(prevShipAngle)*2*shipSize;
+    int y0 = prevShipY + sin(prevShipAngle)*2*shipSize;
     
-    int x1 = prevShipX + cos(prevShipAngle - oneThird)*size;
-    int y1 = prevShipY + sin(prevShipAngle - oneThird)*size;
+    int x1 = prevShipX + cos(prevShipAngle - oneThird)*shipSize;
+    int y1 = prevShipY + sin(prevShipAngle - oneThird)*shipSize;
 
-    int x2 = prevShipX + cos(prevShipAngle + oneThird)*size;
-    int y2 = prevShipY + sin(prevShipAngle + oneThird)*size;
+    int x2 = prevShipX + cos(prevShipAngle + oneThird)*shipSize;
+    int y2 = prevShipY + sin(prevShipAngle + oneThird)*shipSize;
     */
 
 
 
 
     /*
-    int x0 = shipX + cos(prevShipAngle)*size;
-    int y0 = shipY + sin(prevShipAngle)*size;
-    int x1 = shipX + cos(prevShipAngle - 1.25f*oneThird)*size;
-    int y1 = shipY + sin(prevShipAngle - 1.25f*oneThird)*size;
+    int x0 = shipX + cos(prevShipAngle)*shipSize;
+    int y0 = shipY + sin(prevShipAngle)*shipSize;
+    int x1 = shipX + cos(prevShipAngle - 1.25f*oneThird)*shipSize;
+    int y1 = shipY + sin(prevShipAngle - 1.25f*oneThird)*shipSize;
 
-    int x2 = shipX + cos(prevShipAngle + 1.25f*oneThird)*size;
-    int y2 = shipY + sin(prevShipAngle + 1.25f*oneThird)*size;
+    int x2 = shipX + cos(prevShipAngle + 1.25f*oneThird)*shipSize;
+    int y2 = shipY + sin(prevShipAngle + 1.25f*oneThird)*shipSize;
     arduboy.drawLine(x0,y0,x1,y1,BLACK);
     arduboy.drawLine(x1,y1,x2,y2,BLACK);
     arduboy.drawLine(x2,y2,x0,y0,BLACK);
@@ -473,12 +537,12 @@ void loop() {
     */
 
 
-    drawLine(prevShipX, prevShipY, size, prevShipAngle, BLACK);
+    drawLine(prevShipX, prevShipY, shipSize, prevShipAngle, BLACK);
 
     //arduboy.drawCircle(x0,y0,3, WHITE);
 
 
-    //arduboy.drawRect(shipX-halfRectSize,shipY-halfRectSize, halfRectSize*2,halfRectSize*2, BLACK);
+    //arduboy.drawRect(shipX-halfRectshipSize,shipY-halfRectshipSize, halfRectshipSize*2,halfRectshipSize*2, BLACK);
   }
   
   // move ship
@@ -488,39 +552,50 @@ void loop() {
   shipY = wrapY(shipY);
 
   arduboy.setTextColor(0x3c3c3c);
-  arduboy.setTextSize(1);  
+  //arduboy.setTextshipSize(1);  
   arduboy.setCursor(0, 0);
   arduboy.print(score);
 
+
+  
+  arduboy.setCursor(0, HEIGHT-6);
+  //arduboy.print(arduboy.cpuLoad());
   // draw ship
   {
-    int x0 = shipX + cos(shipAngle)*size;
-    int y0 = shipY + sin(shipAngle)*size;
-    int x1 = shipX + cos(shipAngle - 1.25f*oneThird)*size;
-    int y1 = shipY + sin(shipAngle - 1.25f*oneThird)*size;
+    int x0 = shipX + cos(shipAngle)*shipSize;
+    int y0 = shipY + sin(shipAngle)*shipSize;
+    int x1 = shipX + cos(shipAngle - 1.25f*oneThird)*shipSize;
+    int y1 = shipY + sin(shipAngle - 1.25f*oneThird)*shipSize;
 
-    int x2 = shipX + cos(shipAngle + 1.25f*oneThird)*size;
-    int y2 = shipY + sin(shipAngle + 1.25f*oneThird)*size;
-    arduboy.fillCircle(shipX + (shipVelX*1.2f),shipY + (shipVelY*1.2f),size, BLACK);
+    int x2 = shipX + cos(shipAngle + 1.25f*oneThird)*shipSize;
+    int y2 = shipY + sin(shipAngle + 1.25f*oneThird)*shipSize;
+    arduboy.fillCircle(shipX + (shipVelX*1.2f),shipY + (shipVelY*1.2f),shipSize, BLACK);
 
     arduboy.drawLine(x0,y0,x1,y1,WHITE);
     arduboy.drawLine(x1,y1,x2,y2,WHITE);
     arduboy.drawLine(x2,y2,x0,y0,WHITE);
 
-    //arduboy.drawCircle(shipX,shipY, size, WHITE);
-    float eps = 0.01f;
-    if ((shipVelX > eps || shipVelX < -eps) || (shipVelY > eps || shipVelY < -eps)) {
-      int p0 = shipX + cos(shipAngle+3.1415901f) *size;
-      int p1 = shipY + sin(shipAngle+3.1415901f) *size;
-      //spawnParticle(p0, p1, -shipVelX, -shipVelY);
-      //int p0 = (x1 + x2 )/2;
-      //int p1 = (y1 + y2 )/2;
-      //arduboy.drawPixel(p0, p1, BLACK);
+    //arduboy.drawCircle(shipX,shipY, shipSize, WHITE);
+    if (arduboy.pressed(B_BUTTON)) {
+      float eps = 0.01f;
+      if ((shipVelX > eps || shipVelX < -eps) || (shipVelY > eps || shipVelY < -eps)) {
+        int p0 = shipX + cos(shipAngle+3.1415901f) *shipSize;
+        int p1 = shipY + sin(shipAngle+3.1415901f) *shipSize;
+        //spawnParticle(p0, p1, -shipVelX, -shipVelY);
+        //int p0 = (x1 + x2 )/2;
+        //int p1 = (y1 + y2 )/2;
+        //arduboy.drawPixel(p0, p1, BLACK);
 
-      spawnParticle(x1, y1, -shipVelX, -shipVelY);
-      spawnParticle(x2, y2, -shipVelX, -shipVelY);
-      //spawnShipParticle(x1, y1);
-      //spawnShipParticle(x2, y2);
+        //spawnParticle(0.5f*(x1+x2), 0.5f*(y1+y2), shipVelX*0.5f, shipVelY*0.5f);
+        
+        float v = DO_SCREEN_CLEAR ? 0.0f : 0.5f;
+
+        spawnShipParticle(x2, y2, -shipVelX*v, -shipVelY*v);
+        spawnShipParticle(x1, y1, -shipVelX*v, -shipVelY*v);
+        //spawnShipParticle((x2+x1)/2, (y1+y2)/2, -shipVelX*v, -shipVelY*v);
+        //spawnShipParticle(x1, y1);
+        //spawnShipParticle(x2, y2);
+      }
     }
   }
   
