@@ -161,10 +161,12 @@ int spawnAsteroid(int s) {
     int randomInnerScreenY = bitBigger + random(HEIGHT-bitBigger2);
     int randomInnerScreenX = bitBigger + random(WIDTH-bitBigger2);
     float randomAngle = (random(60)/60.0f) * 3.1415901*2;
-    asteroidX[i] = max(-bitBigger2, min(WIDTH+bitBigger2, randomInnerScreenX + cos(randomAngle)*WIDTH));
-    asteroidY[i] = max(-bitBigger2, min(HEIGHT+bitBigger2, randomInnerScreenY + sin(randomAngle)*HEIGHT));
-    asteroidVelX[i] = cos(randomAngle) * -0.75f;
-    asteroidVelY[i] = sin(randomAngle) * -0.75f;
+    
+    asteroidX[i] = max(-bitBigger2, min(WIDTH  + bitBigger2, randomInnerScreenX + cos(randomAngle)*(WIDTH-HEIGHT)));
+    asteroidY[i] = max(-bitBigger2, min(HEIGHT + bitBigger2, randomInnerScreenY + sin(randomAngle)*(WIDTH-HEIGHT)));
+
+    asteroidVelX[i] = cos(3.14159f+randomAngle) * 0.75f;
+    asteroidVelY[i] = sin(3.14159f+randomAngle) * 0.75f;
     /*
     if (r == 0) {
       asteroidX[i] = -dist;
@@ -246,6 +248,11 @@ void setup() {
   }
   arduboy.initRandomSeed();
   arduboy.clear();
+  arduboy.setCursor(0, 0);
+  arduboy.setTextSize(1);
+  arduboy.print(F("asteroids\nby 00jknight"));
+  arduboy.display();
+  arduboy.delayShort(1000);
 }
 
 void drawLine(float x, float y, float size, float angle, uint8_t color) {
