@@ -150,14 +150,22 @@ void spawnParticle(int x, int y, float velX, float velY) {
   arduboy.drawPixel(x,y);
 }
 int spawnAsteroid(int s) {
-    int dist = asteroidSize*3*s;
-    int bitBigger = asteroidSize+2;
+    int dist = asteroidSize*3+s;
+    int bitBigger = (s+asteroidSize)*3;
     int bitBigger2 = 2*bitBigger;
     int r = random(0,4);
     int i = asteroidCounter;
     asteroidVelX[i] = 0.25f + 0.75f*(random(40)/40.0f);
     asteroidVelY[i] = 0.25f + 0.75f*(random(40)/40.0f);
     asteroidSizes[i] = s;
+    int randomInnerScreenY = bitBigger + random(HEIGHT-bitBigger2);
+    int randomInnerScreenX = bitBigger + random(WIDTH-bitBigger2);
+    float randomAngle = (random(60)/60.0f) * 3.1415901*2;
+    asteroidX[i] = max(-bitBigger2, min(WIDTH+bitBigger2, randomInnerScreenX + cos(randomAngle)*WIDTH));
+    asteroidY[i] = max(-bitBigger2, min(HEIGHT+bitBigger2, randomInnerScreenY + sin(randomAngle)*HEIGHT));
+    asteroidVelX[i] = cos(randomAngle) * -0.75f;
+    asteroidVelY[i] = sin(randomAngle) * -0.75f;
+    /*
     if (r == 0) {
       asteroidX[i] = -dist;
       asteroidY[i] = bitBigger + random (HEIGHT-bitBigger2);
@@ -186,6 +194,7 @@ int spawnAsteroid(int s) {
       asteroidVelX[i] = asteroidX[i] > WIDTH/2 ? -asteroidVelX[i] : asteroidVelX[i];
       //asteroidVelX[i] = 0;
     }
+    */
     asteroids++;
     asteroidActive[i] = 1;
     asteroidBeenOnScreen[i] = 0;
